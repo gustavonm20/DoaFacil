@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Ambiente virtual
+venv/
+env/
+.venv/
+
+# Banco de dados local (gerado automaticamente pelo banco.py)
+instance/
+
+# Uploads de usuários (imagens enviadas em tempo de execução)
+static/uploads/
+
+# Configurações de IDE
+.vscode/
+.idea/
+
+# Sistema
+.DS_Store
+Thumbs.db
