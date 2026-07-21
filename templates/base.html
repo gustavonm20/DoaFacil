@@ -14,7 +14,10 @@
                 <a href="{{ url_for('index') }}" class="logo">
                     <i class="fas fa-hand-holding-heart"></i> DoaFácil
                 </a>
-                <ul class="nav-menu">
+                <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="nav-menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <ul class="nav-menu" id="nav-menu">
                     <li><a href="{{ url_for('index') }}">Início</a></li>
                     <li class="dropdown">
                         <a href="{{ url_for('categorias') }}" class="dropbtn">Categorias <i class="fas fa-chevron-down"></i></a>
@@ -46,7 +49,7 @@
                         <li><a href="{{ url_for('cadastro') }}" class="btn-register">Cadastrar</a></li>
                     {% endif %}
                     <li>
-                        <button id="theme-toggle" class="theme-btn">
+                        <button id="theme-toggle" class="theme-btn" type="button" aria-label="Ativar modo escuro" title="Alternar tema">
                             <i class="fas fa-moon"></i>
                         </button>
                     </li>

@@ -36,7 +36,12 @@
                 <div class="card-footer">
                     <span class="donor-name">Por: {{ doacao.doador.nome }}</span>
                     <div class="card-actions">
-                        <a href="{{ url_for('favoritar', doacao_id=doacao.id) }}" class="btn-fav"><i class="far fa-heart"></i></a>
+                        {% if current_user.is_authenticated and current_user.id != doacao.doador_id %}
+                        <form action="{{ url_for('favoritar', doacao_id=doacao.id) }}" method="POST" class="inline-form">
+                            <input type="hidden" name="proxima" value="{{ request.full_path }}">
+                            <button class="btn-fav" type="submit" aria-label="Adicionar aos favoritos"><i class="far fa-heart"></i></button>
+                        </form>
+                        {% endif %}
                         <a href="{{ url_for('detalhes_doacao', doacao_id=doacao.id) }}" class="btn btn-small">Ver Detalhes</a>
                     </div>
                 </div>

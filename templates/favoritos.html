@@ -10,14 +10,21 @@
         {% for f in favoritos %}
         <div class="card">
             <div class="card-image">
-                <img src="{{ url_for('static', filename='uploads/' + f.doacao.imagem) if f.doacao.imagem else 'https://via.placeholder.com/300x200' }}" alt="">
+                {% if f.doacao.imagem and f.doacao.imagem.startswith('http') %}
+                <img src="{{ f.doacao.imagem }}" alt="{{ f.doacao.titulo }}">
+                {% else %}
+                <img src="{{ url_for('static', filename='uploads/' + f.doacao.imagem) if f.doacao.imagem else 'https://via.placeholder.com/300x200' }}" alt="{{ f.doacao.titulo }}">
+                {% endif %}
             </div>
             <div class="card-content">
                 <h3>{{ f.doacao.titulo }}</h3>
                 <p>{{ f.doacao.cidade }}</p>
                 <div class="card-actions">
                     <a href="{{ url_for('detalhes_doacao', doacao_id=f.doacao.id) }}" class="btn btn-small">Ver</a>
-                    <a href="{{ url_for('favoritar', doacao_id=f.doacao.id) }}" class="btn-fav active"><i class="fas fa-heart"></i></a>
+                    <form action="{{ url_for('favoritar', doacao_id=f.doacao.id) }}" method="POST" class="inline-form">
+                        <input type="hidden" name="proxima" value="{{ request.path }}">
+                        <button class="btn-fav active" type="submit" aria-label="Remover dos favoritos"><i class="fas fa-heart"></i></button>
+                    </form>
                 </div>
             </div>
         </div>

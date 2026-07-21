@@ -44,7 +44,9 @@
                         <td><span class="status-badge {{ d.status.lower() }}">{{ d.status }}</span></td>
                         <td>
                             <a href="{{ url_for('editar_doacao', id=d.id) }}" class="btn-icon"><i class="fas fa-edit"></i></a>
-                            <a href="{{ url_for('deletar_doacao', id=d.id) }}" class="btn-icon delete" onclick="return confirm('Excluir?')"><i class="fas fa-trash"></i></a>
+                            <form action="{{ url_for('deletar_doacao', id=d.id) }}" method="POST" class="inline-form" data-confirm="Excluir este anúncio? Essa ação não pode ser desfeita.">
+                                <button type="submit" class="btn-icon delete" aria-label="Excluir {{ d.titulo }}"><i class="fas fa-trash"></i></button>
+                            </form>
                         </td>
                     </tr>
                     {% endfor %}
@@ -68,8 +70,12 @@
                 </div>
                 {% if s.status == 'Pendente' %}
                 <div class="request-actions">
-                    <a href="{{ url_for('responder_solicitacao', id=s.id, acao='aceitar') }}" class="btn btn-small btn-primary">Aceitar</a>
-                    <a href="{{ url_for('responder_solicitacao', id=s.id, acao='recusar') }}" class="btn btn-small btn-danger">Recusar</a>
+                    <form action="{{ url_for('responder_solicitacao', id=s.id, acao='aceitar') }}" method="POST" class="inline-form" data-confirm="Aceitar esta solicitação e reservar o anúncio?">
+                        <button type="submit" class="btn btn-small btn-primary">Aceitar</button>
+                    </form>
+                    <form action="{{ url_for('responder_solicitacao', id=s.id, acao='recusar') }}" method="POST" class="inline-form" data-confirm="Recusar esta solicitação?">
+                        <button type="submit" class="btn btn-small btn-danger">Recusar</button>
+                    </form>
                 </div>
                 {% endif %}
             </div>

@@ -1,8 +1,8 @@
 import os
+from uuid import uuid4
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 from modelos import db, Usuario, Categoria, Subcategoria, Doacao, PetDetalhes, Favorito, Solicitacao
 from banco import inicializar_banco
 
@@ -21,6 +21,7 @@ os.makedirs(upload_path, exist_ok=True)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['UPLOAD_FOLDER'] = upload_path
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 db.init_app(app)
 login_manager = LoginManager()
@@ -34,6 +35,23 @@ def load_user(user_id):
 @app.context_processor
 def inject_categories():
     return dict(todas_categorias_global=Categoria.query.all())
+
+
+def imagem_permitida(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+
+
+def salvar_imagem(arquivo):
+    """Salva uma imagem com nome único e retorna o nome do arquivo."""
+    if not arquivo or not arquivo.filename:
+        return None
+    if not imagem_permitida(arquivo.filename):
+        raise ValueError('Envie uma imagem em PNG, JPG, GIF ou WEBP.')
+
+    extensao = arquivo.filename.rsplit('.', 1)[1].lower()
+    filename = f'{uuid4().hex}.{extensao}'
+    arquivo.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    return filename
 
 # Inicializar banco e pastas
 with app.app_context():
@@ -62,11 +80,12 @@ def privacidade():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email')
+        email = request.form.get('email', '').strip().lower()
         senha = request.form.get('senha')
         usuario = Usuario.query.filter_by(email=email).first()
         if usuario and check_password_hash(usuario.senha, senha):
             login_user(usuario)
+            flash(f'Que bom ter você de volta, {usuario.nome.split()[0]}!')
             return redirect(url_for('index'))
         flash('Email ou senha incorretos.')
     return render_template('login.html')
@@ -74,8 +93,8 @@ def login():
 @app.route('/cadastro', methods=['GET', 'POST'])
 def cadastro():
     if request.method == 'POST':
-        nome = request.form.get('nome')
-        email = request.form.get('email')
+        nome = request.form.get('nome', '').strip()
+        email = request.form.get('email', '').strip().lower()
         senha = request.form.get('senha')
         telefone = request.form.get('telefone')
         cidade = request.form.get('cidade')
@@ -83,6 +102,15 @@ def cadastro():
         tipo_perfil = request.form.get('tipo_perfil')
         tipo_doador = request.form.get('tipo_doador')
         
+        if not all([nome, email, senha, telefone, cidade, bairro]):
+            flash('Preencha todos os campos obrigatórios.')
+            return redirect(url_for('cadastro'))
+        if len(senha) < 6:
+            flash('A senha deve ter pelo menos 6 caracteres.')
+            return redirect(url_for('cadastro'))
+        if tipo_perfil not in {'Doador', 'Adotante'}:
+            flash('Escolha um tipo de perfil válido.')
+            return redirect(url_for('cadastro'))
         if Usuario.query.filter_by(email=email).first():
             flash('Email já cadastrado.')
             return redirect(url_for('cadastro'))
@@ -95,6 +123,7 @@ def cadastro():
         db.session.add(novo_usuario)
         db.session.commit()
         login_user(novo_usuario)
+        flash('Conta criada com sucesso. Bem-vindo ao DoaFácil!')
         return redirect(url_for('index'))
     return render_template('cadastro.html')
 
@@ -133,7 +162,7 @@ def nova_doacao():
         return redirect(url_for('index'))
         
     if request.method == 'POST':
-        titulo = request.form.get('titulo')
+        titulo = request.form.get('titulo', '').strip()
         categoria_id = request.form.get('categoria')
         subcategoria_id = request.form.get('subcategoria')
         descricao = request.form.get('descricao')
@@ -142,11 +171,16 @@ def nova_doacao():
         whatsapp = request.form.get('whatsapp')
         condicao = request.form.get('condicao')
         
-        imagem = request.files.get('imagem')
-        filename = None
-        if imagem:
-            filename = secure_filename(imagem.filename)
-            imagem.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        categoria = Categoria.query.get(categoria_id)
+        subcategoria = Subcategoria.query.get(subcategoria_id)
+        if not titulo or not descricao or not categoria or not subcategoria or subcategoria.categoria_id != categoria.id:
+            flash('Revise os campos obrigatórios e a categoria escolhida.')
+            return redirect(url_for('nova_doacao'))
+        try:
+            filename = salvar_imagem(request.files.get('imagem'))
+        except ValueError as erro:
+            flash(str(erro))
+            return redirect(url_for('nova_doacao'))
             
         doacao = Doacao(
             titulo=titulo, categoria_id=categoria_id, subcategoria_id=subcategoria_id,
@@ -158,7 +192,7 @@ def nova_doacao():
         
         # Se for Pet
         cat_pet = Categoria.query.filter_by(nome='Pets').first()
-        if int(categoria_id) == cat_pet.id:
+        if cat_pet and categoria.id == cat_pet.id:
             pet = PetDetalhes(
                 doacao_id=doacao.id,
                 nome_pet=request.form.get('nome_pet'),
@@ -175,6 +209,7 @@ def nova_doacao():
             db.session.add(pet)
             
         db.session.commit()
+        flash('Anúncio publicado. Obrigado por fazer a diferença!')
         return redirect(url_for('painel_doador'))
         
     categorias = Categoria.query.all()
@@ -192,19 +227,25 @@ def editar_doacao(id):
         doacao.descricao = request.form.get('descricao')
         doacao.cidade = request.form.get('cidade')
         doacao.bairro = request.form.get('bairro')
-        doacao.status = request.form.get('status')
+        novo_status = request.form.get('status')
+        if novo_status not in {'Disponível', 'Reservado', 'Doado'}:
+            flash('Status inválido.')
+            return redirect(url_for('editar_doacao', id=id))
+        doacao.status = novo_status
         db.session.commit()
+        flash('Anúncio atualizado com sucesso.')
         return redirect(url_for('painel_doador'))
         
     return render_template('editar_doacao.html', doacao=doacao)
 
-@app.route('/deletar_doacao/<int:id>')
+@app.route('/deletar_doacao/<int:id>', methods=['POST'])
 @login_required
 def deletar_doacao(id):
     doacao = Doacao.query.get_or_404(id)
     if doacao.doador_id == current_user.id:
         db.session.delete(doacao)
         db.session.commit()
+        flash('Anúncio excluído.')
     return redirect(url_for('painel_doador'))
 
 @app.route('/painel_doador')
@@ -220,13 +261,31 @@ def painel_doador():
 @login_required
 def solicitar_doacao(doacao_id):
     doacao = Doacao.query.get_or_404(doacao_id)
+    if current_user.tipo_perfil != 'Adotante':
+        flash('Use uma conta de adotante/receptor para solicitar doações.')
+        return redirect(url_for('detalhes_doacao', doacao_id=doacao.id))
+    if doacao.doador_id == current_user.id:
+        flash('Você não pode solicitar a sua própria doação.')
+        return redirect(url_for('detalhes_doacao', doacao_id=doacao.id))
+    if doacao.status != 'Disponível':
+        flash('Esta doação não está mais disponível.')
+        return redirect(url_for('detalhes_doacao', doacao_id=doacao.id))
     if request.method == 'POST':
+        if Solicitacao.query.filter_by(doacao_id=doacao_id, solicitante_id=current_user.id).first():
+            flash('Você já enviou uma solicitação para este anúncio.')
+            return redirect(url_for('minhas_solicitacoes'))
+        mensagem = request.form.get('mensagem', '').strip()
+        motivo = request.form.get('motivo', '').strip()
+        telefone = request.form.get('telefone', '').strip()
+        if not mensagem or not motivo or not telefone:
+            flash('Preencha todos os campos da solicitação.')
+            return redirect(url_for('solicitar_doacao', doacao_id=doacao_id))
         solicitacao = Solicitacao(
             doacao_id=doacao_id,
             solicitante_id=current_user.id,
-            mensagem=request.form.get('mensagem'),
-            motivo=request.form.get('motivo'),
-            telefone_contato=request.form.get('telefone')
+            mensagem=mensagem,
+            motivo=motivo,
+            telefone_contato=telefone
         )
         db.session.add(solicitacao)
         db.session.commit()
@@ -265,7 +324,7 @@ def painel_admin():
                            usuarios=usuarios,
                            doacoes=doacoes)
 
-@app.route('/favoritar/<int:doacao_id>')
+@app.route('/favoritar/<int:doacao_id>', methods=['POST'])
 @login_required
 def favoritar(doacao_id):
     fav = Favorito.query.filter_by(usuario_id=current_user.id, doacao_id=doacao_id).first()
@@ -275,7 +334,7 @@ def favoritar(doacao_id):
         novo_fav = Favorito(usuario_id=current_user.id, doacao_id=doacao_id)
         db.session.add(novo_fav)
     db.session.commit()
-    return redirect(request.referrer or url_for('index'))
+    return redirect(request.form.get('proxima') or request.referrer or url_for('index'))
 
 @app.route('/favoritos')
 @login_required
@@ -292,7 +351,7 @@ def busca():
     sub_id = request.args.get('subcategoria')
     cidade = request.args.get('cidade')
     
-    query = Doacao.query
+    query = Doacao.query.filter_by(status='Disponível')
     if q:
         query = query.filter(Doacao.titulo.contains(q) | Doacao.descricao.contains(q))
     if cat_id:
@@ -306,13 +365,21 @@ def busca():
     categoria = Categoria.query.get(cat_id) if cat_id else None
     return render_template('categoria.html', doacoes=resultados, busca=True, q=q, categoria=categoria)
 
-@app.route('/responder_solicitacao/<int:id>/<string:acao>')
+@app.route('/responder_solicitacao/<int:id>/<string:acao>', methods=['POST'])
 @login_required
 def responder_solicitacao(id, acao):
     sol = Solicitacao.query.get_or_404(id)
-    if sol.doacao.doador_id == current_user.id:
+    if sol.doacao.doador_id == current_user.id and sol.status == 'Pendente' and acao in {'aceitar', 'recusar'}:
         sol.status = 'Aceito' if acao == 'aceitar' else 'Recusado'
+        if acao == 'aceitar':
+            sol.doacao.status = 'Reservado'
+            Solicitacao.query.filter(
+                Solicitacao.doacao_id == sol.doacao_id,
+                Solicitacao.id != sol.id,
+                Solicitacao.status == 'Pendente'
+            ).update({'status': 'Recusado'}, synchronize_session=False)
         db.session.commit()
+        flash('Solicitação atualizada.')
     return redirect(url_for('painel_doador'))
 
 @app.errorhandler(404)

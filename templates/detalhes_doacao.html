@@ -66,7 +66,7 @@
                 </div>
                 <div class="detail-actions">
                     {% if current_user.is_authenticated %}
-                        {% if current_user.id != doacao.doador_id %}
+                        {% if current_user.id != doacao.doador_id and doacao.status == 'Disponível' %}
                             <a href="{{ url_for('solicitar_doacao', doacao_id=doacao.id) }}" class="btn btn-primary btn-full">
                                 {{ 'Tenho Interesse' if doacao.categoria.nome == 'Pets' else 'Solicitar Doação' }}
                             </a>
@@ -74,9 +74,14 @@
                                target="_blank" class="btn btn-whatsapp btn-full">
                                 <i class="fab fa-whatsapp"></i> Entrar em Contato
                             </a>
-                            <a href="{{ url_for('favoritar', doacao_id=doacao.id) }}" class="btn btn-outline btn-full">
+                            <form action="{{ url_for('favoritar', doacao_id=doacao.id) }}" method="POST">
+                                <input type="hidden" name="proxima" value="{{ request.path }}">
+                                <button type="submit" class="btn btn-outline btn-full">
                                 <i class="{{ 'fas' if favoritado else 'far' }} fa-heart"></i> {{ 'Remover dos Favoritos' if favoritado else 'Adicionar aos Favoritos' }}
-                            </a>
+                                </button>
+                            </form>
+                        {% elif current_user.id != doacao.doador_id %}
+                            <p class="login-alert">Este anúncio não está disponível no momento.</p>
                         {% else %}
                             <a href="{{ url_for('editar_doacao', id=doacao.id) }}" class="btn btn-secondary btn-full">Editar Anúncio</a>
                         {% endif %}

@@ -68,6 +68,8 @@ class PetDetalhes(db.Model):
     requisitos_adocao = db.Column(db.Text)
 
 class Favorito(db.Model):
+    __table_args__ = (db.UniqueConstraint('usuario_id', 'doacao_id', name='uq_favorito_usuario_doacao'),)
+
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     doacao_id = db.Column(db.Integer, db.ForeignKey('doacao.id'), nullable=False)

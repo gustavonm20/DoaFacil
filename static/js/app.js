@@ -1,37 +1,63 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Theme Toggle
-    const themeToggle = document.getElementById('theme-toggle');
     const body = document.body;
-    const icon = themeToggle.querySelector('i');
+    const themeToggle = document.getElementById('theme-toggle');
+    const menuToggle = document.querySelector('.menu-toggle');
+    const navMenu = document.getElementById('nav-menu');
 
-    // Load saved theme
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    body.setAttribute('data-theme', savedTheme);
-    updateIcon(savedTheme);
+    function aplicarTema(theme) {
+        body.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
 
-    themeToggle.addEventListener('click', () => {
-        const currentTheme = body.getAttribute('data-theme');
-        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-        
-        body.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
-        updateIcon(newTheme);
-    });
-
-    function updateIcon(theme) {
-        if (theme === 'dark') {
-            icon.classList.replace('fa-moon', 'fa-sun');
-        } else {
-            icon.classList.replace('fa-sun', 'fa-moon');
+        if (themeToggle) {
+            const icon = themeToggle.querySelector('i');
+            icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            themeToggle.setAttribute('aria-label', theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro');
         }
     }
 
-    // Auto-hide alerts
-    const alerts = document.querySelectorAll('.alert');
-    alerts.forEach(alert => {
-        setTimeout(() => {
-            alert.style.opacity = '0';
-            setTimeout(() => alert.remove(), 500);
-        }, 3000);
+    aplicarTema(localStorage.getItem('theme') || 'light');
+
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            aplicarTema(body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+        });
+    }
+
+    if (menuToggle && navMenu) {
+        menuToggle.addEventListener('click', () => {
+            const aberto = navMenu.classList.toggle('is-open');
+            menuToggle.setAttribute('aria-expanded', String(aberto));
+            menuToggle.querySelector('i').className = aberto ? 'fas fa-times' : 'fas fa-bars';
+        });
+    }
+
+    const perfil = document.getElementById('tipo_perfil');
+    const tipoDoador = document.getElementById('tipo_doador_group');
+    function atualizarTipoDoador() {
+        if (perfil && tipoDoador) tipoDoador.hidden = perfil.value !== 'Doador';
+    }
+    if (perfil) {
+        perfil.addEventListener('change', atualizarTipoDoador);
+        atualizarTipoDoador();
+    }
+
+    document.querySelectorAll('input[type="tel"], input[name="telefone"], input[name="whatsapp"]').forEach((input) => {
+        input.addEventListener('input', () => {
+            const numeros = input.value.replace(/\D/g, '').slice(0, 11);
+            input.value = numeros.replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2');
+        });
+    });
+
+    document.querySelectorAll('[data-confirm]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            if (!window.confirm(form.dataset.confirm)) event.preventDefault();
+        });
+    });
+
+    document.querySelectorAll('.alert').forEach((alert) => {
+        window.setTimeout(() => {
+            alert.classList.add('is-hiding');
+            window.setTimeout(() => alert.remove(), 250);
+        }, 4200);
     });
 });
